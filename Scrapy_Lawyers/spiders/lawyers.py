@@ -1,6 +1,4 @@
 import scrapy
-import math
-import re
 from Scrapy_Lawyers.items import LawyersItem
 from urllib.parse import urljoin
 from nameparser import HumanName
