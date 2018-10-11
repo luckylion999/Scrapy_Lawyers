@@ -8,7 +8,7 @@ import re
 TAG_RE = re.compile(r'<[^>]+>')
 
 
-class AlibabaCrawler(scrapy.Spider):
+class LawyersCrawler(scrapy.Spider):
     name = 'lawyers_crawler'
     allowed_domains = ['lawyers.com']
     start_urls = ['https://www.lawyers.com/find-a-lawyer/']
