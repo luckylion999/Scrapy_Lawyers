@@ -16,7 +16,7 @@ class LawyersItem(scrapy.Item):
     Law_Firm_Logo = scrapy.Field()
     Client_Rating = scrapy.Field()
     Client_Reviews_Number = scrapy.Field()
-    Percentage_Reommended = scrapy.Field()
+    Percentage_Recommended = scrapy.Field()
     Peer_Rating = scrapy.Field()
     BirthDate = scrapy.Field()
     Certifications = scrapy.Field()

@@ -2,6 +2,10 @@ import scrapy
 from Scrapy_Lawyers.items import LawyersItem
 from urllib.parse import urljoin
 from nameparser import HumanName
+import re
+
+
+TAG_RE = re.compile(r'<[^>]+>')
 
 
 class AlibabaCrawler(scrapy.Spider):
@@ -83,14 +87,19 @@ class AlibabaCrawler(scrapy.Spider):
         item['PhoneNumber'] = phone[0] if phone else ''
         fax = response.xpath('//div[@class="row profile-contact-information"]//span[@class="pc-right"]/text()').extract_first()
         item['Fax'] = fax.strip() if fax else ''
-        item['Website'] = response.xpath('//div[@class="row profile-contact-information"]'
+        website = response.xpath('//div[@class="row profile-contact-information"]'
                                          '//span[@class="pc-right"]/a/text()').extract()
+        item['Website'] = get_separated(website)
         address = response.xpath('//*[@class="pc-address"]/span[2]//text()').extract()
         item['Address'] = ' '.join([add.strip().encode("cp1252").decode('utf_8', 'ignore') for add in address])
+        desc_result = ''
         description = response.xpath('//div[@class="show-more-content"]/text()').extract()
         if not description:
             description = response.xpath('//div[@class="show-less-content"]/text()').extract()
-        item['Description'] = [desc.strip() for desc in description] if description else ''
+        for desc in description:
+            if desc.strip():
+                desc_result += desc.strip() + ' '
+        item['Description'] = desc_result
         avatar = response.xpath('//img[contains(@class, "ap-attorney-photo")]/@data-echo').extract()
         item['Avatar'] = 'https:' + avatar[0] if avatar else ''
 
@@ -104,7 +113,7 @@ class AlibabaCrawler(scrapy.Spider):
         client_review_num = response.xpath('//a[@name="profile-client-reviews"]'
                                            '/following-sibling::div[@class="review-area"][1]'
                                            '//big/span/text()').extract()
-        item['Percentage_Reommended'] = client_review[0] if client_review else ''
+        item['Percentage_Recommended'] = client_review[0] if client_review else ''
         item['Client_Rating'] = client_review[1] if client_review else ''
         item['Client_Reviews_Number'] = client_review_num[1] if client_review_num else ''
 
@@ -117,26 +126,49 @@ class AlibabaCrawler(scrapy.Spider):
         for sel in selector:
             title = sel.xpath('./div[contains(@class, "profile-sub-title-area")]/strong/text()').extract_first()
             if title == 'Position':
-                item['Position'] = get_credential(sel)
+                item['Position'] = get_credential(sel, '')
             if title == 'Birth Information':
-                item['BirthDate'] = get_credential(sel)
+                item['BirthDate'] = get_credential(sel, 'birthdate')
             if title == 'Certifications':
-                item['Certifications'] = get_credential(sel)
+                item['Certifications'] = get_credential(sel, '')
             if title == 'Languages':
-                item['Languages'] = get_credential(sel)
+                item['Languages'] = get_credential(sel, '')
             if title == 'Admission Details':
-                item['Admission_Details'] = get_credential(sel)
+                item['Admission_Details'] = get_credential(sel, '')
             if title == 'Law School Attended':
-                item['Law_School_Attented'] = get_credential(sel)
+                item['Law_School_Attented'] = get_credential(sel, 'low school')
             if title == 'Associations & Memberships':
-                item['Association_Name'] = get_credential(sel)
+                item['Association_Name'] = get_credential(sel, '')
         yield item
 
 
-def get_credential(sel):
-    value = ''
+def get_credential(sel, param):
     data_list = sel.xpath('./div[contains(@class, "profile-credentials-content-area")]//text()').extract()
+    if param == '':
+        return get_separated(data_list)
+    elif param == 'low school':
+        data = sel.xpath('./div[contains(@class, "profile-credentials-content-area")]'
+                         '/div[@class="truncate-text"]').extract_first()
+        if not data:
+            return ''
+        law_school_result = ''
+        list = data.split('<br><br>')
+        for l in list:
+            law_school_result += TAG_RE.sub('', l.replace('<br>', ' ')) + ' | '
+        return law_school_result[:-3]
+    elif param == 'birthdate':
+        birth_result = ''
+        for data in data_list:
+            if data.strip():
+                birth_result += data.strip() + ' '
+        return birth_result
+
+
+def get_separated(data_list):
+    if not data_list:
+        return ''
+    result = ''
     for data in data_list:
         if data.strip():
-            value += data.strip() + ' '
-    return value
+            result += data + ' | '
+    return result[:-3]
