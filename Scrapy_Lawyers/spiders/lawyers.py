@@ -58,16 +58,21 @@ class AlibabaCrawler(scrapy.Spider):
         attorney_link = response.xpath('//h3[contains(text(), "Attorneys at This Firm")]/'
                                        'following-sibling::div[1]'
                                        '//div[@class="fp-attorney-details"]/a/@href').extract()
+        item = LawyersItem()
+        item['FirmSize'] = len(attorney_link)
         for attorney in attorney_link:
-            yield scrapy.Request(
-                url=urljoin(response.url, attorney),
-                callback=self.parse_detail,
-                headers=self.HEADER,
-                dont_filter=True
-            )
+            if attorney not in self.unique_data:
+                self.unique_data.add(attorney)
+                yield scrapy.Request(
+                    url=urljoin(response.url, attorney),
+                    callback=self.parse_detail,
+                    headers=self.HEADER,
+                    dont_filter=True,
+                    meta={'item': item}
+                )
 
     def parse_detail(self, response):
-        item = LawyersItem()
+        item = response.meta.get('item')
         name = response.xpath('//h1[@class="profile-summary-title"]/text()').extract_first()
         item['FirstName'] = HumanName(name).first
         item['MiddleName'] = HumanName(name).middle
@@ -88,8 +93,50 @@ class AlibabaCrawler(scrapy.Spider):
         item['Description'] = [desc.strip() for desc in description] if description else ''
         avatar = response.xpath('//img[contains(@class, "ap-attorney-photo")]/@data-echo').extract()
         item['Avatar'] = 'https:' + avatar[0] if avatar else ''
-        rating = response.xpath('//div[@class="break-space"]/big/strong/text()').extract()
-        item['StarRating'] = rating[0] if rating else ''
+
         item['url'] = response.url
 
+        law_firm_logo = response.xpath('//img[@itemprop="logo"]/@data-echo').extract()
+        item['Law_Firm_Logo'] = 'https:' + law_firm_logo[0] if law_firm_logo else ''
+        client_review = response.xpath('//a[@name="profile-client-reviews"]'
+                                       '/following-sibling::div[@class="review-area"][1]'
+                                       '//big/strong/text()').extract()
+        client_review_num = response.xpath('//a[@name="profile-client-reviews"]'
+                                           '/following-sibling::div[@class="review-area"][1]'
+                                           '//big/span/text()').extract()
+        item['Percentage_Reommended'] = client_review[0] if client_review else ''
+        item['Client_Rating'] = client_review[1] if client_review else ''
+        item['Client_Reviews_Number'] = client_review_num[1] if client_review_num else ''
+
+        peer_rating = response.xpath('//a[@name="profile-peer-reviews"]'
+                                     '/following-sibling::div[@class="review-area"][1]'
+                                     '//big/strong/text()').extract()
+        item['Peer_Rating'] = peer_rating[0] if peer_rating else ''
+
+        selector = response.xpath('//div[@class="profile-detail-area"]/div[@class="row profile-detail-item"]')
+        for sel in selector:
+            title = sel.xpath('./div[contains(@class, "profile-sub-title-area")]/strong/text()').extract_first()
+            if title == 'Position':
+                item['Position'] = get_credential(sel)
+            if title == 'Birth Information':
+                item['BirthDate'] = get_credential(sel)
+            if title == 'Certifications':
+                item['Certifications'] = get_credential(sel)
+            if title == 'Languages':
+                item['Languages'] = get_credential(sel)
+            if title == 'Admission Details':
+                item['Admission_Details'] = get_credential(sel)
+            if title == 'Law School Attended':
+                item['Law_School_Attented'] = get_credential(sel)
+            if title == 'Associations & Memberships':
+                item['Association_Name'] = get_credential(sel)
         yield item
+
+
+def get_credential(sel):
+    value = ''
+    data_list = sel.xpath('./div[contains(@class, "profile-credentials-content-area")]//text()').extract()
+    for data in data_list:
+        if data.strip():
+            value += data.strip() + ' '
+    return value
