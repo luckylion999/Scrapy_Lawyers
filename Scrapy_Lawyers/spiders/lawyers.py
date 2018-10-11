@@ -86,7 +86,7 @@ class AlibabaCrawler(scrapy.Spider):
         item['Website'] = response.xpath('//div[@class="row profile-contact-information"]'
                                          '//span[@class="pc-right"]/a/text()').extract()
         address = response.xpath('//*[@class="pc-address"]/span[2]//text()').extract()
-        item['Address'] = ' '.join([add.strip() for add in address])
+        item['Address'] = ' '.join([add.strip().encode("cp1252").decode('utf_8', 'ignore') for add in address])
         description = response.xpath('//div[@class="show-more-content"]/text()').extract()
         if not description:
             description = response.xpath('//div[@class="show-less-content"]/text()').extract()
